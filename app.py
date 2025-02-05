@@ -2,6 +2,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
+from pathlib import Path
 
 # Configure page
 st.set_page_config(
@@ -10,11 +11,23 @@ st.set_page_config(
     layout="centered"
 )
 
+# Initialize paths
+LOGO_PATH = Path(__file__).parent / "Stirling QR Logo.png"
+PDF_PATH = Path(__file__).parent / "document.pdf"
+
 # Initialize session states
 if 'submitted' not in st.session_state:
     st.session_state.submitted = False
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
+
+# Function to display logo with error handling
+def display_logo():
+    try:
+        st.image(str(LOGO_PATH), use_container_width=True)
+    except FileNotFoundError:
+        st.error("⚠️ Logo file missing - please ensure 'Stirling QR Logo.png' exists in the root directory")
+        st.stop()
 
 # Login sidebar
 with st.sidebar:
@@ -53,13 +66,13 @@ if st.session_state.logged_in:
     except FileNotFoundError:
         st.warning("No leads collected yet")
     
-    st.stop()  # Prevent showing main form when logged in
+    st.stop()
 
 # Main form logic
 if not st.session_state.submitted:
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
-        st.image("Stirling QR Logo.png", use_column_width=True)
+        display_logo()
     
     st.title("Download Our Quality Assurance Recruitment Guide")
     
@@ -91,16 +104,6 @@ if not st.session_state.submitted:
                     updated = pd.DataFrame(new_lead)
                 
                 updated.to_csv("leads.csv", index=False)
-                
-                # Trigger download
-                with open("document.pdf", "rb") as f:
-                    st.download_button(
-                        label="Download Guide (PDF)",
-                        data=f,
-                        file_name="QA_Recruitment_Guide.pdf",
-                        mime="application/pdf"
-                    )
-                
                 st.session_state.submitted = True
                 st.rerun()
             else:
@@ -110,10 +113,22 @@ if not st.session_state.submitted:
 else:
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
-        st.image("Stirling QR Logo.png", use_column_width=True)
+        display_logo()
     
     st.title("🎉 Download Complete!")
     st.balloons()
+    
+    try:
+        with open(PDF_PATH, "rb") as f:
+            st.download_button(
+                label="Download Guide (PDF)",
+                data=f,
+                file_name="QA_Recruitment_Guide.pdf",
+                mime="application/pdf"
+            )
+    except FileNotFoundError:
+        st.error("⚠️ PDF document missing - please ensure 'document.pdf' exists in the root directory")
+        st.stop()
     
     st.markdown("""
     **Your guide should start downloading automatically.**  
