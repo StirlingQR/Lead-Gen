@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # Initialize paths
-LOGO_PATH = Path(__file__).parent / "Stirling QR Logo.png"
+LOGO_PATH = Path(__file__).parent / "Stirling_QR_Logo.png"
 PDF_PATH = Path(__file__).parent / "document.pdf"
 
 # Initialize session states
@@ -35,7 +35,7 @@ def display_logo():
     try:
         st.image(str(LOGO_PATH), use_container_width=True)
     except FileNotFoundError:
-        st.error("⚠️ Logo file missing - please ensure 'Stirling QR Logo.png' exists in the root directory")
+        st.error("⚠️ Logo file missing - please ensure 'Stirling_QR_Logo.png' exists in the root directory")
         st.stop()
 
 # Login sidebar
