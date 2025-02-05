@@ -11,11 +11,15 @@ st.set_page_config(
     layout="centered"
 )
 
-# File paths with error handling
+# Initialize paths with correct filename (no spaces)
+LOGO_PATH = Path(__file__).parent / "Stirling_QR_Logo.png"
+PDF_PATH = Path(__file__).parent / "document.pdf"
+
 def validate_files():
+    """Check for required files with proper error handling"""
     required_files = {
-        "LOGO": Path(__file__).parent / "Stirling_QR_Logo.png",
-        "PDF": Path(__file__.parent / "document.pdf"
+        "LOGO": LOGO_PATH,
+        "PDF": PDF_PATH
     }
     
     missing = [name for name, path in required_files.items() if not path.exists()]
@@ -35,16 +39,16 @@ session_defaults = {
 for key, val in session_defaults.items():
     st.session_state.setdefault(key, val)
 
-# Logo display component
 def display_logo():
+    """Display logo with proper error handling"""
     try:
         st.image(str(files["LOGO"]), use_container_width=True)
     except Exception as e:
         st.error(f"Logo display error: {str(e)}")
         st.stop()
 
-# Login management
 def admin_panel():
+    """Admin login and leads management"""
     with st.sidebar:
         if not st.session_state.logged_in:
             st.title("Admin Login")
@@ -64,18 +68,18 @@ def admin_panel():
         try:
             leads_df = pd.read_csv("leads.csv")
             
-            # Delete leads functionality
+            # Lead deletion interface
             with st.expander("Manage Leads"):
+                st.write("Select leads to delete:")
+                delete_indices = []
                 for idx, row in leads_df.iterrows():
-                    cols = st.columns([5,1])
-                    cols[0].write(f"{row['Name']} - {row['Email']}")
-                    if cols[1].button("Delete", key=f"del_{idx}"):
-                        st.session_state.delete_leads.append(idx)
+                    if st.checkbox(f"{row['Name']} - {row['Email']}", key=f"del_{idx}"):
+                        delete_indices.append(idx)
                 
-                if st.button("Confirm Deletions"):
-                    leads_df = leads_df.drop(st.session_state.delete_leads)
+                if st.button("Confirm Deletions") and delete_indices:
+                    leads_df = leads_df.drop(delete_indices)
                     leads_df.to_csv("leads.csv", index=False)
-                    st.session_state.delete_leads = []
+                    st.success(f"Deleted {len(delete_indices)} leads")
                     st.rerun()
             
             st.dataframe(leads_df, use_container_width=True)
@@ -98,8 +102,8 @@ def admin_panel():
         
         st.stop()
 
-# Main form component
 def lead_form():
+    """Main lead capture form"""
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         display_logo()
@@ -140,8 +144,8 @@ def lead_form():
             else:
                 st.error("Please complete all required fields")
 
-# Thank you page
 def thank_you():
+    """Thank you page with download"""
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         display_logo()
@@ -149,12 +153,16 @@ def thank_you():
     st.title("🎉 Download Complete!")
     st.balloons()
     
-    st.download_button(
-        label="Download Guide (PDF)",
-        data=files["PDF"].read_bytes(),
-        file_name="QA_Recruitment_Guide.pdf",
-        mime="application/octet-stream"
-    )
+    try:
+        st.download_button(
+            label="Download Guide (PDF)",
+            data=PDF_PATH.read_bytes(),
+            file_name="QA_Recruitment_Guide.pdf",
+            mime="application/octet-stream"
+        )
+    except Exception as e:
+        st.error(f"Download error: {str(e)}")
+        st.stop()
     
     st.markdown("""
     **Your document should begin downloading automatically.**  
