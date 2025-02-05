@@ -12,7 +12,7 @@ st.set_page_config(
 )
 
 # SharePoint PDF URL (replace with your actual link)
-SHAREPOINT_PDF_URL = "https://davidsongray.sharepoint.com/:x:/g/StirlingQR/EXemyZNC3dJEookq0KOZUsQBCQ016J3KiiJDVTPhmQK8RA?e=69QBjG"
+SHAREPOINT_PDF_URL = "https://davidsongray-my.sharepoint.com/:b:/g/personal/chris_stirling_stirlingqr_com/Ecck3wvpY9ZFngLCjJP4ECsBGmyh0PN1-m-GTGPzhIuhMg?e=d77jE6"
 
 # Initialize paths with correct filename (no spaces)
 LOGO_PATH = Path(__file__).parent / "Stirling_QR_Logo.png"
