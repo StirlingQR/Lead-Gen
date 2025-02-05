@@ -21,7 +21,16 @@ if 'submitted' not in st.session_state:
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 
-# Function to display logo with error handling
+# File handling function
+def get_pdf_bytes():
+    try:
+        with open(PDF_PATH, "rb") as f:
+            return f.read()
+    except FileNotFoundError:
+        st.error("⚠️ PDF document missing - please ensure 'document.pdf' exists in the root directory")
+        st.stop()
+
+# Logo display with error handling
 def display_logo():
     try:
         st.image(str(LOGO_PATH), use_container_width=True)
@@ -118,21 +127,18 @@ else:
     st.title("🎉 Download Complete!")
     st.balloons()
     
-    try:
-        with open(PDF_PATH, "rb") as f:
-            st.download_button(
-                label="Download Guide (PDF)",
-                data=f,
-                file_name="QA_Recruitment_Guide.pdf",
-                mime="application/pdf"
-            )
-    except FileNotFoundError:
-        st.error("⚠️ PDF document missing - please ensure 'document.pdf' exists in the root directory")
-        st.stop()
+    # Trigger PDF download
+    pdf_bytes = get_pdf_bytes()
+    st.download_button(
+        label="Download Guide (PDF)",
+        data=pdf_bytes,
+        file_name="QA_Recruitment_Guide.pdf",
+        mime="application/octet-stream"
+    )
     
     st.markdown("""
-    **Your guide should start downloading automatically.**  
-    Can't see it? Check your downloads folder or click the download button again.
+    **Your document should begin downloading automatically.**  
+    If it doesn't start within a few seconds, click the download button above.
     
     ### Next Steps:
     1. Check your email for confirmation
