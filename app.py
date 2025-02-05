@@ -11,80 +11,95 @@ st.set_page_config(
     layout="centered"
 )
 
-# Initialize paths with correct filename (no spaces)
-LOGO_PATH = Path(__file__).parent / "Stirling_QR_Logo.png"
-PDF_PATH = Path(__file__).parent / "document.pdf"
+# File paths with error handling
+def validate_files():
+    required_files = {
+        "LOGO": Path(__file__).parent / "Stirling_QR_Logo.png",
+        "PDF": Path(__file__.parent / "document.pdf"
+    }
+    
+    missing = [name for name, path in required_files.items() if not path.exists()]
+    if missing:
+        st.error(f"Missing files: {', '.join(missing)}")
+        st.stop()
+    return required_files
+
+files = validate_files()
 
 # Initialize session states
-if 'submitted' not in st.session_state:
-    st.session_state.submitted = False
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
+session_defaults = {
+    'submitted': False,
+    'logged_in': False,
+    'delete_leads': []
+}
+for key, val in session_defaults.items():
+    st.session_state.setdefault(key, val)
 
+# Logo display component
 def display_logo():
-    """Display logo with error handling"""
     try:
-        st.image(str(LOGO_PATH), use_container_width=True)
+        st.image(str(files["LOGO"]), use_container_width=True)
     except Exception as e:
-        st.error(f"""
-        **Missing Required Files**  
-        Ensure these files exist in your repository root:
-        - ✅ `Stirling_QR_Logo.png`  
-        - ✅ `document.pdf`  
-        Current path: {LOGO_PATH.resolve()}  
-        Error: {str(e)}
-        """)
+        st.error(f"Logo display error: {str(e)}")
         st.stop()
 
-def get_pdf_bytes():
-    """Handle PDF file loading"""
-    try:
-        return PDF_PATH.read_bytes()
-    except FileNotFoundError:
-        st.error("Missing PDF file - ensure 'document.pdf' exists in root directory")
-        st.stop()
-
-# Login sidebar
-with st.sidebar:
-    if not st.session_state.logged_in:
-        st.title("Admin Login")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        
-        if st.button("Login"):
-            if username == "chris@stirlingqr.com" and password == "Measure897!":
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Invalid credentials")
-
-# Admin panel
-if st.session_state.logged_in:
-    st.title("🔐 Leads Dashboard")
-    
-    try:
-        leads_df = pd.read_csv("leads.csv")
-        st.dataframe(leads_df, use_container_width=True)
-        
-        csv = leads_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="Download CSV",
-            data=csv,
-            file_name="leads.csv",
-            mime="text/csv"
-        )
-        
-        if st.button("Logout"):
-            st.session_state.logged_in = False
-            st.rerun()
+# Login management
+def admin_panel():
+    with st.sidebar:
+        if not st.session_state.logged_in:
+            st.title("Admin Login")
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
             
-    except FileNotFoundError:
-        st.warning("No leads collected yet")
+            if st.button("Login"):
+                if username == "chris@stirlingqr.com" and password == "Measure897!":
+                    st.session_state.logged_in = True
+                    st.rerun()
+                else:
+                    st.error("Invalid credentials")
     
-    st.stop()
+    if st.session_state.logged_in:
+        st.title("🔐 Leads Dashboard")
+        
+        try:
+            leads_df = pd.read_csv("leads.csv")
+            
+            # Delete leads functionality
+            with st.expander("Manage Leads"):
+                for idx, row in leads_df.iterrows():
+                    cols = st.columns([5,1])
+                    cols[0].write(f"{row['Name']} - {row['Email']}")
+                    if cols[1].button("Delete", key=f"del_{idx}"):
+                        st.session_state.delete_leads.append(idx)
+                
+                if st.button("Confirm Deletions"):
+                    leads_df = leads_df.drop(st.session_state.delete_leads)
+                    leads_df.to_csv("leads.csv", index=False)
+                    st.session_state.delete_leads = []
+                    st.rerun()
+            
+            st.dataframe(leads_df, use_container_width=True)
+            
+            # CSV export
+            csv = leads_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name="leads.csv",
+                mime="text/csv"
+            )
+            
+            if st.button("Logout"):
+                st.session_state.logged_in = False
+                st.rerun()
+                
+        except FileNotFoundError:
+            st.warning("No leads collected yet")
+        
+        st.stop()
 
-# Main form logic
-if not st.session_state.submitted:
+# Main form component
+def lead_form():
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         display_logo()
@@ -95,6 +110,7 @@ if not st.session_state.submitted:
         name = st.text_input("Full Name*")
         email = st.text_input("Email*")
         phone = st.text_input("Phone Number*")
+        company = st.text_input("Company Name (optional)")
         
         st.markdown("""
         *By entering your information, you consent to Stirling Q&R collecting and storing your details. 
@@ -104,27 +120,28 @@ if not st.session_state.submitted:
         
         if st.form_submit_button("Download Now →"):
             if all([name, email, phone]):
-                new_lead = pd.DataFrame({
-                    "Name": [name],
-                    "Email": [email],
-                    "Phone": [phone],
-                    "Timestamp": [datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
-                })
+                new_lead = {
+                    "Name": name,
+                    "Email": email,
+                    "Phone": phone,
+                    "Company": company,
+                    "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
                 
                 try:
-                    existing = pd.read_csv("leads.csv")
-                    updated = pd.concat([existing, new_lead])
+                    leads_df = pd.read_csv("leads.csv")
+                    leads_df = pd.concat([leads_df, pd.DataFrame([new_lead])])
                 except FileNotFoundError:
-                    updated = new_lead
+                    leads_df = pd.DataFrame([new_lead])
                 
-                updated.to_csv("leads.csv", index=False)
+                leads_df.to_csv("leads.csv", index=False)
                 st.session_state.submitted = True
                 st.rerun()
             else:
                 st.error("Please complete all required fields")
 
 # Thank you page
-else:
+def thank_you():
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         display_logo()
@@ -132,10 +149,9 @@ else:
     st.title("🎉 Download Complete!")
     st.balloons()
     
-    # PDF download
     st.download_button(
         label="Download Guide (PDF)",
-        data=get_pdf_bytes(),
+        data=files["PDF"].read_bytes(),
         file_name="QA_Recruitment_Guide.pdf",
         mime="application/octet-stream"
     )
@@ -151,3 +167,11 @@ else:
     
     *Looking forward to helping with your QA recruitment needs!*
     """)
+
+# App flow control
+admin_panel()
+
+if not st.session_state.submitted:
+    lead_form()
+else:
+    thank_you()
