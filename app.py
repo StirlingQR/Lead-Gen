@@ -96,5 +96,5 @@ else:
     **Next Steps:**
     - Check your email for a confirmation
    - Expect a follow-up call from our team within 24 hours
-    - Save our number: +44 1234 567890
+    - Save our number: UK: +44 1293 307201 | US: +1 415 808 5554
     """)
