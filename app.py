@@ -6,16 +6,20 @@ from pathlib import Path
 
 # Configure page
 st.set_page_config(
-    page_title="Stirling Q&R Lead Generation",
+    page_title="Stirling Q&R - Exclusive Agency Guide",
     page_icon="📈",
     layout="centered"
 )
 
-# SharePoint PDF URL (replace with your actual link)
-SHAREPOINT_PDF_URL = "https://davidsongray-my.sharepoint.com/:b:/g/personal/chris_stirling_stirlingqr_com/Ecck3wvpY9ZFngLCjJP4ECsBGmyh0PN1-m-GTGPzhIuhMg?e=d77jE6"
-
-# Initialize paths with correct filename (no spaces)
+# File paths (update with your actual GitHub raw URLs)
 LOGO_PATH = Path(__file__).parent / "Stirling_QR_Logo.png"
+PDF_URL = "https://raw.githubusercontent.com/[your-username]/[your-repo]/main/Top-5-Considerations-Before-Signing-an-Exclusive-Agency-Agreement.pdf"
+
+# Initialize session states
+if 'submitted' not in st.session_state:
+    st.session_state.submitted = False
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
 
 def display_logo():
     """Display logo with error handling"""
@@ -25,7 +29,7 @@ def display_logo():
         st.error(f"Missing logo file: {LOGO_PATH.name}")
         st.stop()
 
-# Login management
+# Admin panel with enhanced lead management
 def admin_panel():
     with st.sidebar:
         if not st.session_state.logged_in:
@@ -46,19 +50,27 @@ def admin_panel():
         try:
             leads_df = pd.read_csv("leads.csv", dtype={'Phone': str})
             
-            # Delete leads interface
-            st.write("**Manage Leads:**")
-            for idx in reversed(range(len(leads_df))):
-                cols = st.columns([4,1,1])
-                cols[0].write(f"{leads_df.iloc[idx]['Name']} - {leads_df.iloc[idx]['Email']}")
-                cols[1].write(leads_df.iloc[idx]['Phone'])
-                if cols[2].button("🗑️", key=f"del_{idx}"):
-                    leads_df = leads_df.drop(index=idx)
-                    leads_df.to_csv("leads.csv", index=False)
-                    st.rerun()
+            # Enhanced lead management
+            with st.expander("Manage Leads (Delete with 🗑️)"):
+                for idx in reversed(range(len(leads_df))):
+                    cols = st.columns([3,2,1,1])
+                    cols[0].write(f"**{leads_df.iloc[idx]['Name']}**")
+                    cols[1].write(f"{leads_df.iloc[idx]['Email']}")
+                    cols[2].write(f"{leads_df.iloc[idx]['Phone']}")
+                    if cols[3].button("🗑️", key=f"del_{idx}"):
+                        leads_df = leads_df.drop(index=idx)
+                        leads_df.to_csv("leads.csv", index=False)
+                        st.rerun()
+            
+            # Real-time statistics
+            st.markdown("### Placement Metrics")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total Leads", len(leads_df))
+            col2.metric("Recent Submissions", leads_df[leads_df['Timestamp'] > pd.Timestamp.now() - pd.DateOffset(days=7)].shape[0])
+            col3.metric("Companies", leads_df['Company'].nunique())
             
             st.download_button(
-                "Download CSV", 
+                "Download Full Lead Data", 
                 leads_df.to_csv(index=False), 
                 "leads.csv", 
                 "text/csv"
@@ -72,22 +84,26 @@ def admin_panel():
             st.warning("No leads collected yet")
         st.stop()
 
+# Main lead capture form
 def lead_form():
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         display_logo()
     
-    st.title("Download Our Recruitment Guide")
+    st.title("Download 2025 Exclusive Agency Guide")
     
     with st.form("lead_form"):
         name = st.text_input("Full Name*")
-        email = st.text_input("Email*")
-        phone = st.text_input("Phone Number*", help="Enter as text to preserve formatting")
+        email = st.text_input("Work Email*")
+        phone = st.text_input("Direct Phone*", help="Include country code")
         company = st.text_input("Company Name (optional)")
         
-        st.markdown("""*By entering your information...*""")  # Your privacy text
+        st.markdown("""
+        *By submitting, you agree to Stirling Q&R's Privacy Policy and consent to being contacted 
+        about Quality/Regulatory recruitment solutions.*
+        """)
         
-        if st.form_submit_button("Download Now →"):
+        if st.form_submit_button("Get Your Guide →"):
             if all([name, email, phone]):
                 new_lead = pd.DataFrame([{
                     "Name": name,
@@ -106,30 +122,56 @@ def lead_form():
                 updated.to_csv("leads.csv", index=False)
                 st.session_state.submitted = True
                 st.rerun()
+            else:
+                st.error("Please complete all required fields")
 
-def thank_you():
+# PDF Viewer Page
+def pdf_viewer():
     col1, col2, col3 = st.columns([1,2,1])
     with col2:
         display_logo()
     
-    st.title("🎉 Download Complete!")
+    st.title("Your 2025 Exclusive Agency Guide")
     st.balloons()
     
-    # SharePoint PDF download solution
+    # PDF Viewer with Google Docs integration
     st.markdown(f"""
-    <script>
-    window.open("{SHAREPOINT_PDF_URL}", "_blank");
-    </script>
+    <iframe src="https://docs.google.com/viewer?url={PDF_URL}&embedded=true" 
+            width="100%" 
+            height="800px" 
+            style="border: none; margin-top: 20px;">
+    </iframe>
     """, unsafe_allow_html=True)
     
+    # Download options
     st.markdown(f"""
-    **Your download should start automatically.**  
-    If not, [click here to download the guide]({SHAREPOINT_PDF_URL})
+    <div style="margin-top: 30px; text-align: center;">
+        <a href="{PDF_URL}" download>
+            <button style="
+                background-color: #0047AB;
+                color: white;
+                padding: 12px 24px;
+                border: none;
+                border-radius: 5px;
+                font-size: 16px;
+                cursor: pointer;">
+                📥 Download Full Guide
+            </button>
+        </a>
+    </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    **Next Steps:**
+    1. Review key considerations (hyperlinks work in downloaded PDF)
+    2. [Book Strategy Session](https://calendly.com/stirlingqr)
+    3. Contact Chris: +44 1234 567890
+    """)
 
-# App flow
+# App flow control
 admin_panel()
+
 if not st.session_state.submitted:
     lead_form()
 else:
-    thank_you()
+    pdf_viewer()
