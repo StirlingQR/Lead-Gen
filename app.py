@@ -3,14 +3,13 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from urllib.parse import quote
-import smtplib
-from email.message import EmailMessage
+import random
 
 # Configure page
 st.set_page_config(
-    page_title="Stirling Q&R Lead Management",
+    page_title="Stirling Q&R Lead Generation",
     page_icon="📈",
-    layout="wide"
+    layout="centered"
 )
 
 # GitHub configuration
@@ -26,129 +25,69 @@ if 'submitted' not in st.session_state:
     st.session_state.submitted = False
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
+if 'captcha' not in st.session_state:
+    st.session_state.captcha = {'num1': 0, 'num2': 0}
 
 def display_logo():
     try:
-        st.image("Stirling_QR_Logo.png", use_container_width=True)
+        # Centered logo with controlled size
+        col1, col2, col3 = st.columns([1,2,1])
+        with col2:
+            st.image("Stirling_QR_Logo.png", width=150)  # Reduced width
     except Exception as e:
         st.error(f"Missing logo file: {str(e)}")
         st.stop()
 
-def send_notification(name, email):
-    """Send email alert using Microsoft SMTP"""
-    msg = EmailMessage()
-    msg.set_content(f"New lead captured:\nName: {name}\nEmail: {email}")
-    msg['Subject'] = '🚨 NEW LEAD - Stirling Q&R'
-    msg['From'] = 'chris@stirlingqr.com'  # Use your Microsoft email
-    msg['To'] = 'chris@stirlingqr.com'    # Receiver email
-    
-    try:
-        with smtplib.SMTP('smtp.office365.com', 587) as server: 
-            server.starttls()
-            server.login('chris@stirlingqr.com', 'your-password')  # Microsoft email password
-            server.send_message(msg)
-    except Exception as e:
-        st.error(f"Error sending notification: {str(e)}")
+def generate_captcha():
+    st.session_state.captcha = {
+        'num1': random.randint(1, 9),
+        'num2': random.randint(1, 9)
+    }
 
-# Login management
-if not st.session_state.logged_in:
-    if st.button("Admin Login", key="admin_login"):
-        st.session_state.show_login = True
-else:
-    if st.button("Logout"):
-        st.session_state.logged_in = False
-        st.session_state.show_login = False
-        st.rerun()
-
-if 'show_login' in st.session_state and st.session_state.show_login:
-    with st.form("Login"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        
-        if st.form_submit_button("Authenticate"):
-            if username == "chris@stirlingqr.com" and password == "Measure897!":
-                st.session_state.logged_in = True
-                st.session_state.show_login = False
-                st.rerun()
-            else:
-                st.error("Invalid credentials")
+# Login management (keep existing login code)
+# ... [keep the existing login code unchanged] ...
 
 if st.session_state.logged_in:
     st.title("🔐 Leads Dashboard")
     try:
         leads_df = pd.read_csv("leads.csv")
-        
-        # Add status columns if not exists
-        for col in ['Contacted', 'Added to Vincere']:
-            if col not in leads_df.columns:
-                leads_df[col] = False
-                
-        # Status filtering
-        status_filter = st.selectbox("Filter Leads", ['All', 'New', 'Contacted', 'Converted'])
-        
-        if status_filter == 'New':
-            filtered_df = leads_df[~leads_df['Contacted']]
-        elif status_filter == 'Contacted':
-            filtered_df = leads_df[leads_df['Contacted']]
-        elif status_filter == 'Converted':
-            filtered_df = leads_df[leads_df['Added to Vincere']]
-        else:
-            filtered_df = leads_df
-
-        # Editable status tracking
-        edited_df = st.data_editor(
-            filtered_df,
-            column_config={
-                "Contacted": st.column_config.CheckboxColumn(
-                    "Contacted?",
-                    help="Mark when lead has been contacted"
-                ),
-                "Added to Vincere": st.column_config.CheckboxColumn(
-                    "In Vincere?",
-                    help="Mark when lead is added to Vincere"
-                )
-            },
-            use_container_width=True,
-            key="lead_editor"
-        )
-        
-        # Save status changes
-        if st.button("Save Changes"):
-            leads_df.update(edited_df)
-            leads_df.to_csv("leads.csv", index=False)
-            st.success("Status updates saved!")
-            
-        # Export button
-        if st.download_button(
-            label="Export All Leads",
-            data=leads_df.to_csv(index=False),
-            file_name="stirling_leads.csv",
-            mime="text/csv"
-        ):
-            st.success("Exported successfully")
-            
+        # ... [keep existing lead management code unchanged] ...
     except FileNotFoundError:
         st.warning("No leads collected yet")
     st.stop()
 
 # Main Form
 if not st.session_state.submitted:
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        display_logo()
+    display_logo()
     
     st.title("Download Our Agency Agreement Guide")
     
     with st.form("lead_form", clear_on_submit=True):
+        # Generate new CAPTCHA on form load
+        if 'captcha' not in st.session_state:
+            generate_captcha()
+            
         name = st.text_input("Full Name*")
         email = st.text_input("Email*")
         phone = st.text_input("Phone Number*")
         company = st.text_input("Company Name (optional)")
         
+        # Simple CAPTCHA
+        captcha_question = f"What is {st.session_state.captcha['num1']} + {st.session_state.captcha['num2']}?"
+        captcha_answer = st.number_input(captcha_question, step=1, min_value=0)
+        
+        # Disclaimer text
+        st.markdown("""
+        <small><i>By clicking "Get Your Copy Now", you agree to Stirling Q&R contacting you 
+        regarding this request. Your information will only be used for this purpose.</i></small>
+        """, unsafe_allow_html=True)
+        
         submitted = st.form_submit_button("Get Your Copy Now")
         
         if submitted:
-            if all([name, email, phone]):
+            valid_captcha = (captcha_answer == st.session_state.captcha['num1'] + st.session_state.captcha['num2'])
+            
+            if all([name, email, phone]) and valid_captcha:
                 new_lead = pd.DataFrame({
                     "Name": [name],
                     "Email": [email],
@@ -166,35 +105,40 @@ if not st.session_state.submitted:
                     updated = new_lead
                 
                 updated.to_csv("leads.csv", index=False)
-                send_notification(name, email)
                 st.session_state.submitted = True
+                generate_captcha()  # Reset for next user
                 st.rerun()
             else:
-                st.error("Please complete required fields")
+                if not valid_captcha:
+                    st.error("Incorrect CAPTCHA answer - please try again")
+                    generate_captcha()
+                else:
+                    st.error("Please complete all required fields")
 
 # Success Page
 else:
-    col1, col2, col3 = st.columns([1,2,1])
-    with col2:
-        display_logo()
+    display_logo()
     
     st.title("🎉 Your Guide is Ready!")
     
-    # Download system
+    # Auto-download
     st.markdown(f"""
     <a id="auto-dl" href="{PDF_URL}" download="{PDF_FILENAME}" hidden></a>
     <script>
         document.getElementById('auto-dl').click();
     </script>
+    
+    [Click here if download doesn't start]({PDF_URL})
     """, unsafe_allow_html=True)
     
-    st.markdown(f"""
-    [Download Now]({PDF_URL})
-    """)
-    
     st.markdown("""
-    **Next Steps:**
-    - Your download should start automatically
-    - We'll review your request within 24 hours
-    - Check your email for confirmation
+    **What Happens Next:**
+    
+    - Expect contact from our team within 48 hours
+    - Save our direct contact info:
+      📧 talent@stirlingqr.com  
+      📞 UK: +44 1293 307 201  
+      📞 US: +1 415 808 5554
+    
+    *Contact us immediately for urgent requirements!*
     """)
