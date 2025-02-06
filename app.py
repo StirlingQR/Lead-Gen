@@ -3,6 +3,8 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from urllib.parse import quote
+import smtplib
+from email.message import EmailMessage
 
 # Configure page
 st.set_page_config(
@@ -24,8 +26,6 @@ if 'submitted' not in st.session_state:
     st.session_state.submitted = False
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
-if 'selected_leads' not in st.session_state:
-    st.session_state.selected_leads = []
 
 def display_logo():
     try:
@@ -33,6 +33,22 @@ def display_logo():
     except Exception as e:
         st.error(f"Missing logo file: {str(e)}")
         st.stop()
+
+def send_notification(name, email):
+    """Send email alert for new lead"""
+    msg = EmailMessage()
+    msg.set_content(f"New lead received:\nName: {name}\nEmail: {email}")
+    msg['Subject'] = '🚨 NEW LEAD - Stirling Q&R'
+    msg['From'] = 'alerts@stirlingqr.com'  # Update with your email
+    msg['To'] = 'talent@stirlingqr.com'    # Update with your email
+    
+    try:
+        with smtplib.SMTP('your-smtp-server.com', 587) as server:  # Update with your SMTP
+            server.starttls()
+            server.login('your@email.com', 'your-password')  # Update credentials
+            server.send_message(msg)
+    except Exception as e:
+        st.error(f"Error sending notification: {str(e)}")
 
 # Login management
 if not st.session_state.logged_in:
@@ -62,31 +78,23 @@ if st.session_state.logged_in:
     try:
         leads_df = pd.read_csv("leads.csv")
         
-        # Lead deletion system
-        with st.form("delete_form"):
-            st.session_state.selected_leads = []
-            
-            for index, row in leads_df.iterrows():
-                if st.checkbox(f"Select {row['Name']} ({row['Email']})", key=f"lead_{index}"):
-                    st.session_state.selected_leads.append(index)
-            
-            if st.form_submit_button("🗑️ Delete Selected"):
-                if st.session_state.selected_leads:
-                    leads_df = leads_df.drop(st.session_state.selected_leads)
+        # Delete buttons for each row
+        st.markdown("### Current Leads")
+        for index, row in leads_df.iterrows():
+            cols = st.columns([5,5,5,5,1])
+            with cols[0]: st.write(row['Name'])
+            with cols[1]: st.write(row['Email'])
+            with cols[2]: st.write(row['Phone'])
+            with cols[3]: st.write(row['Company'])
+            with cols[4]: 
+                if st.button("❌", key=f"del_{index}"):
+                    leads_df = leads_df.drop(index)
                     leads_df.to_csv("leads.csv", index=False)
-                    st.success(f"Deleted {len(st.session_state.selected_leads)} leads")
-                    st.session_state.selected_leads = []
                     st.rerun()
-                else:
-                    st.warning("Select leads to delete first")
         
-        st.dataframe(
-            leads_df.style.format({"Phone": lambda x: f"{x}"}),
-            use_container_width=True
-        )
-        
+        # Export button
         if st.download_button(
-            label="Export Leads",
+            label="Export All Leads",
             data=leads_df.to_csv(index=False),
             file_name="stirling_leads.csv",
             mime="text/csv"
@@ -107,29 +115,30 @@ if not st.session_state.submitted:
     
     with st.form("lead_form", clear_on_submit=True):
         name = st.text_input("Full Name*")
-        email = st.text_input("Work Email*")
-        phone = st.text_input("Direct Phone*")
-        company = st.text_input("Company Name")
+        email = st.text_input("Email*")
+        phone = st.text_input("Phone Number*")
+        company = st.text_input("Company Name (optional)")
         
         submitted = st.form_submit_button("Get Your Copy Now")
         
         if submitted:
             if all([name, email, phone]):
-                new_entry = {
-                    "Name": name,
-                    "Email": email,
-                    "Phone": phone.replace(" ", ""),
-                    "Company": company,
+                new_lead = pd.DataFrame({
+                    "Name": [name],
+                    "Email": [email],
+                    "Phone": [phone.replace(" ", "")],
+                    "Company": [company],
                     "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }
+                })
                 
                 try:
                     existing = pd.read_csv("leads.csv")
-                    updated = pd.concat([existing, pd.DataFrame([new_entry])])
+                    updated = pd.concat([existing, new_lead])
                 except FileNotFoundError:
-                    updated = pd.DataFrame([new_entry])
+                    updated = new_lead
                 
                 updated.to_csv("leads.csv", index=False)
+                send_notification(name, email)
                 st.session_state.submitted = True
                 st.rerun()
             else:
@@ -142,32 +151,32 @@ else:
         display_logo()
     
     st.title("🎉 Your Guide is Ready!")
-    st.success("✅ Your download should start automatically!")
     
-    # Auto-download and preview
+    # Auto-download with retry
     st.markdown(f"""
-    <a id="auto-dl" href="{PDF_URL}" download hidden></a>
+    <a id="auto-download" href="{PDF_URL}" download hidden></a>
     <script>
-        document.getElementById('auto-dl').click();
+        setTimeout(function() {{
+            document.getElementById('auto-download').click();
+            window.open('{PDF_URL}', '_blank').focus();
+        }}, 1000);
     </script>
-    <iframe src="https://docs.google.com/viewer?url={PDF_URL}&embedded=true" 
-            width="100%" 
-            height="600" 
-            style="border:none; margin-top: 1rem; margin-bottom: 2rem">
-    </iframe>
     """, unsafe_allow_html=True)
-
+    
+    st.success("Your download should start automatically. If not, click below:")
+    st.markdown(f"[Download Now]({PDF_URL})")
+    
     # What happens next
     st.markdown("""
     **What Happens Next?**
 
-    1. Our team will review your request
-    2. You'll receive a confirmation within 24 hours
-    3. We'll follow up to discuss your agency agreement needs
-
-    *Need immediate assistance?*  
-    📞 Call: +44 (0)1234 567890  
-    📧 Email: chris@stirlingqr.com
+    - Expect contact from one of our team within 48 hours
+    - Save our details:  
+      📧 talent@stirlingqr.com  
+      📞 UK: +44 1293 307 201  
+      📞 US: +1 415 808 5554  
+      
+    *Contact us immediately for urgent requirements!*
     """)
 
     st.markdown("""
