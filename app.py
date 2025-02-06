@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime
 from urllib.parse import quote
 import random
+import requests
 
 # Configure page
 st.set_page_config(
@@ -27,27 +28,51 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
 if 'captcha' not in st.session_state:
     st.session_state.captcha = {'num1': random.randint(1,9), 'num2': random.randint(1,9)}
-if 'leads_df' not in st.session_state:
-    st.session_state.leads_df = pd.DataFrame()
+
+# Custom styles
+st.markdown("""
+<style>
+    .logo-container {
+        text-align: center;
+        margin: 1rem 0;
+    }
+    .logo-img {
+        width: 180px;
+        margin-bottom: 1.5rem;
+    }
+    .admin-button {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 def display_logo():
     try:
-        st.image("Stirling_QR_Logo.png", use_container_width=True, width=150)
+        st.markdown("""
+        <div class="logo-container">
+            <img class="logo-img" src="https://raw.githubusercontent.com/StirlingQR/Lead-Gen/main/Stirling_QR_Logo.png">
+        </div>
+        """, unsafe_allow_html=True)
     except:
-        st.error("Logo loading issue")
+        st.error("Error loading logo")
 
-# Login management
-if not st.session_state.logged_in:
-    if st.sidebar.button("Admin Login"):
-        st.session_state.show_login = True
-else:
-    if st.sidebar.button("Logout"):
-        st.session_state.logged_in = False
-        st.session_state.show_login = False
-        st.rerun()
+# Persistent admin button
+admin_col, _ = st.columns([1, 5])
+with admin_col:
+    if st.session_state.logged_in:
+        if st.button("Logout", key="logout-btn"):
+            st.session_state.logged_in = False
+            st.rerun()
+    else:
+        if st.button("Admin Login", key="admin-btn"):
+            st.session_state.show_login = True
 
+# Login form
 if 'show_login' in st.session_state and st.session_state.show_login:
-    with st.form("Login"):
+    with st.form("Admin Login"):
+        st.subheader("Admin Login")
         username = st.text_input("Username")
         password = st.text_input("Password", type="password")
         
@@ -56,15 +81,17 @@ if 'show_login' in st.session_state and st.session_state.show_login:
                 st.session_state.logged_in = True
                 st.session_state.show_login = False
                 st.rerun()
+            else:
+                st.error("Invalid credentials")
 
 if st.session_state.logged_in:
     st.title("🔐 Leads Dashboard")
     try:
-        st.session_state.leads_df = pd.read_csv("leads.csv")
+        leads_df = pd.read_csv("leads.csv")
         
         # Delete functionality
         st.markdown("### Current Leads")
-        for index, row in st.session_state.leads_df.iterrows():
+        for index, row in leads_df.iterrows():
             cols = st.columns([5,4,4,2,1])
             with cols[0]: st.write(row['Name'])
             with cols[1]: st.write(row['Email'])
@@ -73,17 +100,21 @@ if st.session_state.logged_in:
                 contacted = st.checkbox("Contacted", value=row.get('Contacted', False), 
                                       key=f"contacted_{index}")
                 if contacted != row.get('Contacted', False):
-                    st.session_state.leads_df.at[index, 'Contacted'] = contacted
+                    leads_df.at[index, 'Contacted'] = contacted
             with cols[4]: 
                 if st.button("❌", key=f"del_{index}"):
-                    st.session_state.leads_df = st.session_state.leads_df.drop(index)
-                    st.session_state.leads_df.to_csv("leads.csv", index=False)
-                    st.experimental_rerun()
+                    leads_df = leads_df.drop(index)
+                    leads_df.to_csv("leads.csv", index=False)
+                    st.rerun()
         
         # Save changes
         if st.button("Save All Changes"):
-            st.session_state.leads_df.to_csv("leads.csv", index=False)
+            leads_df.to_csv("leads.csv", index=False)
             st.success("Changes saved!")
+            
+        # Export
+        st.download_button("Export CSV", data=leads_df.to_csv(index=False), 
+                         file_name="stirling_leads.csv")
             
     except FileNotFoundError:
         st.warning("No leads collected yet")
@@ -127,7 +158,7 @@ if not st.session_state.submitted:
                 updated.to_csv("leads.csv", index=False)
                 st.session_state.submitted = True
                 st.session_state.captcha = {'num1': random.randint(1,9), 'num2': random.randint(1,9)}
-                st.experimental_rerun()
+                st.rerun()
 
 # Success Page
 else:
