@@ -66,7 +66,7 @@ if st.session_state.logged_in:
     try:
         leads_df = pd.read_csv("leads.csv")
         st.dataframe(
-            leads_df.style.format({"Phone": lambda x: f"{x}"),
+            leads_df.style.format({"Phone": lambda x: f"{x}"}),  # FIXED LINE
             use_container_width=True
         )
         
