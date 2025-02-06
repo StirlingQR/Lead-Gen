@@ -8,9 +8,9 @@ from email.message import EmailMessage
 
 # Configure page
 st.set_page_config(
-    page_title="Stirling Q&R Lead Generation",
+    page_title="Stirling Q&R Lead Management",
     page_icon="📈",
-    layout="centered"
+    layout="wide"
 )
 
 # GitHub configuration
@@ -35,17 +35,17 @@ def display_logo():
         st.stop()
 
 def send_notification(name, email):
-    """Send email alert for new lead"""
+    """Send email alert using Microsoft SMTP"""
     msg = EmailMessage()
-    msg.set_content(f"New lead received:\nName: {name}\nEmail: {email}")
+    msg.set_content(f"New lead captured:\nName: {name}\nEmail: {email}")
     msg['Subject'] = '🚨 NEW LEAD - Stirling Q&R'
-    msg['From'] = 'talent@stirlingqr.com'  
-    msg['To'] = 'chris@stirlingqr.com'    
+    msg['From'] = 'chris@stirlingqr.com'  # Use your Microsoft email
+    msg['To'] = 'chris@stirlingqr.com'    # Receiver email
     
     try:
         with smtplib.SMTP('smtp.office365.com', 587) as server: 
             server.starttls()
-            server.login('chris.stirling@stirlingqr.com', 'Measure897!')
+            server.login('chris@stirlingqr.com', 'your-password')  # Microsoft email password
             server.send_message(msg)
     except Exception as e:
         st.error(f"Error sending notification: {str(e)}")
@@ -78,20 +78,46 @@ if st.session_state.logged_in:
     try:
         leads_df = pd.read_csv("leads.csv")
         
-        # Delete buttons for each row
-        st.markdown("### Current Leads")
-        for index, row in leads_df.iterrows():
-            cols = st.columns([5,5,5,5,1])
-            with cols[0]: st.write(row['Name'])
-            with cols[1]: st.write(row['Email'])
-            with cols[2]: st.write(row['Phone'])
-            with cols[3]: st.write(row['Company'])
-            with cols[4]: 
-                if st.button("❌", key=f"del_{index}"):
-                    leads_df = leads_df.drop(index)
-                    leads_df.to_csv("leads.csv", index=False)
-                    st.rerun()
+        # Add status columns if not exists
+        for col in ['Contacted', 'Added to Vincere']:
+            if col not in leads_df.columns:
+                leads_df[col] = False
+                
+        # Status filtering
+        status_filter = st.selectbox("Filter Leads", ['All', 'New', 'Contacted', 'Converted'])
         
+        if status_filter == 'New':
+            filtered_df = leads_df[~leads_df['Contacted']]
+        elif status_filter == 'Contacted':
+            filtered_df = leads_df[leads_df['Contacted']]
+        elif status_filter == 'Converted':
+            filtered_df = leads_df[leads_df['Added to Vincere']]
+        else:
+            filtered_df = leads_df
+
+        # Editable status tracking
+        edited_df = st.data_editor(
+            filtered_df,
+            column_config={
+                "Contacted": st.column_config.CheckboxColumn(
+                    "Contacted?",
+                    help="Mark when lead has been contacted"
+                ),
+                "Added to Vincere": st.column_config.CheckboxColumn(
+                    "In Vincere?",
+                    help="Mark when lead is added to Vincere"
+                )
+            },
+            use_container_width=True,
+            key="lead_editor"
+        )
+        
+        # Save status changes
+        if st.button("Save Changes"):
+            leads_df.update(edited_df)
+            leads_df.to_csv("leads.csv", index=False)
+            st.success("Status updates saved!")
+            
         # Export button
         if st.download_button(
             label="Export All Leads",
@@ -128,7 +154,9 @@ if not st.session_state.submitted:
                     "Email": [email],
                     "Phone": [phone.replace(" ", "")],
                     "Company": [company],
-                    "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "Contacted": False,
+                    "Added to Vincere": False
                 })
                 
                 try:
@@ -152,33 +180,21 @@ else:
     
     st.title("🎉 Your Guide is Ready!")
     
-    # Auto-download with retry
+    # Download system
     st.markdown(f"""
-    <a id="auto-download" href="{PDF_URL}" download hidden></a>
+    <a id="auto-dl" href="{PDF_URL}" download="{PDF_FILENAME}" hidden></a>
     <script>
-        setTimeout(function() {{
-            document.getElementById('auto-download').click();
-            window.open('{PDF_URL}', '_blank').focus();
-        }}, 1000);
+        document.getElementById('auto-dl').click();
     </script>
     """, unsafe_allow_html=True)
     
-    st.success("Your download should start automatically. If not, click below:")
-    st.markdown(f"[Download Now]({PDF_URL})")
-    
-    # What happens next
-    st.markdown("""
-    **What Happens Next?**
-
-    - Expect contact from one of our team within 48 hours
-    - Save our details:  
-      📧 talent@stirlingqr.com  
-      📞 UK: +44 1293 307 201  
-      📞 US: +1 415 808 5554  
-      
-    *Contact us immediately for urgent requirements!*
+    st.markdown(f"""
+    [Download Now]({PDF_URL})
     """)
-
+    
     st.markdown("""
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    """, unsafe_allow_html=True)
+    **Next Steps:**
+    - Your download should start automatically
+    - We'll review your request within 24 hours
+    - Check your email for confirmation
+    """)
