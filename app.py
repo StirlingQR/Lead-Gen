@@ -39,13 +39,13 @@ def send_notification(name, email):
     msg = EmailMessage()
     msg.set_content(f"New lead received:\nName: {name}\nEmail: {email}")
     msg['Subject'] = '🚨 NEW LEAD - Stirling Q&R'
-    msg['From'] = 'alerts@stirlingqr.com'  # Update with your email
-    msg['To'] = 'talent@stirlingqr.com'    # Update with your email
+    msg['From'] = 'talent@stirlingqr.com'  
+    msg['To'] = 'chris@stirlingqr.com'    
     
     try:
-        with smtplib.SMTP('your-smtp-server.com', 587) as server:  # Update with your SMTP
+        with smtplib.SMTP('smtp.office365.com', 587) as server: 
             server.starttls()
-            server.login('your@email.com', 'your-password')  # Update credentials
+            server.login('chris.stirling@stirlingqr.com', 'Measure897!')
             server.send_message(msg)
     except Exception as e:
         st.error(f"Error sending notification: {str(e)}")
