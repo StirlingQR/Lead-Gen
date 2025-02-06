@@ -3,6 +3,8 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 from urllib.parse import quote
+import smtplib
+from email.message import EmailMessage
 
 # Configure page
 st.set_page_config(
@@ -12,9 +14,9 @@ st.set_page_config(
 )
 
 # GitHub configuration - REPLACE WITH YOUR DETAILS
-GITHUB_USER = "stirlington"  # Your GitHub username
-REPO_NAME = "Lead-Gen"       # Your repository name
-BRANCH = "main"              # Your branch name
+GITHUB_USER = "stirlington"
+REPO_NAME = "Lead-Gen"
+BRANCH = "main"
 PDF_FILENAME = "Top 5 Considerations Before Signing an Exclusive Agency Agreement.pdf"
 
 # Encoded PDF URL
@@ -35,26 +37,38 @@ def display_logo():
         st.error(f"Missing logo file: {str(e)}")
         st.stop()
 
-# Login management
-with st.sidebar:
-    if not st.session_state.logged_in:
-        st.title("Admin Login")
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        
-        if st.button("Login"):
-            if username == "chris@stirlingqr.com" and password == "Measure897!":
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Invalid credentials")
+def send_notification(name, email):
+    """Send email alert for new lead"""
+    msg = EmailMessage()
+    msg.set_content(f"New lead received:\nName: {name}\nEmail: {email}")
+    msg['Subject'] = '🚨 New Lead Alert!'
+    msg['From'] = 'alerts@stirlingqr.com'  # Replace with your email
+    msg['To'] = 'chris@stirlingqr.com'     # Replace with your email
+    
+    try:
+        with smtplib.SMTP('your-smtp-server.com', 587) as server:  # Replace with your SMTP
+            server.starttls()
+            server.login('your@email.com', 'your-password')  # Replace with credentials
+            server.send_message(msg)
+    except Exception as e:
+        st.error(f"Error sending notification: {str(e)}")
+
+# Login button
+if not st.session_state.logged_in:
+    cols = st.columns([4,1])
+    with cols[1]:
+        if st.button("Admin Login"):
+            st.switch_page("pages/login.py")
 
 if st.session_state.logged_in:
     st.title("🔐 Leads Dashboard")
     
     try:
         leads_df = pd.read_csv("leads.csv")
-        st.dataframe(leads_df, use_container_width=True)
+        st.dataframe(
+            leads_df.style.format({"Phone": lambda x: f"{x:.0f}"}),
+            use_container_width=True
+        )
         
         csv = leads_df.to_csv(index=False).encode('utf-8')
         st.download_button(
@@ -105,6 +119,7 @@ if not st.session_state.submitted:
                     updated = new_lead
                 
                 updated.to_csv("leads.csv", index=False)
+                send_notification(name, email)
                 st.session_state.submitted = True
                 st.rerun()
 
@@ -114,9 +129,15 @@ else:
         display_logo()
     
     st.title("🎉 Your Guide is Ready!")
-    st.balloons()
+    st.success("✅ Guide successfully downloaded! Check your email", icon="✅")
+    st.toast('New lead captured!', icon='👤')
     
+    # Auto-download and preview
     st.markdown(f"""
+    <a id="auto-download" href="{PDF_URL}" download hidden></a>
+    <script>
+        document.getElementById('auto-download').click();
+    </script>
     <iframe src="https://docs.google.com/viewer?url={PDF_URL}&embedded=true" 
             width="100%" 
             height="800px" 
@@ -124,6 +145,6 @@ else:
     </iframe>
     """, unsafe_allow_html=True)
     
-    st.markdown(f"""
-    [Download PDF Guide]({PDF_URL})
-    """)
+    st.markdown("""
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    """, unsafe_allow_html=True)
